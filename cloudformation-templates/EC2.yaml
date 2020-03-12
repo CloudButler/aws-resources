@@ -366,52 +366,16 @@ Resources:
           packages:
             yum:
               docker: []
-          files:
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Join 
-                - ''
-                - - |
-                    [cfn-auto-reloader-hook]
-                  - |
-                    triggers=post.update
-                  - >
-                    path=Resources.WebServerInstance.Metadata.AWS::CloudFormation::Init
-                  - 'action=/opt/aws/bin/cfn-init -v '
-                  - '         --stack '
-                  - !Ref 'AWS::StackName'
-                  - '         --resource WebServerInstance '
-                  - '         --configsets InstallAndRun '
-                  - '         --region '
-                  - !Ref 'AWS::Region'
-                  - |+
-
-                  - |
-                    runas=root
-              mode: '000400'
-              owner: root
-              group: root
           services:
             sysvinit:
-              mysqld:
+              docker:
                 enabled: 'true'
                 ensureRunning: 'true'
-              httpd:
-                enabled: 'true'
-                ensureRunning: 'true'
-              cfn-hup:
-                enabled: 'true'
-                ensureRunning: 'true'
-                files:
-                  - /etc/cfn/cfn-hup.conf
-                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf
         Configure:
           commands:
-            01_set_mysql_root_password:
+            01_add_ec2user_to_docker_group:
               command: !Join 
-                - ''
-                - - mysqladmin -u root password '
-                  - !Ref DBRootPassword
-                  - ''''
+                - 'usermod -a -G docker ec2-user'
               test: !Join 
                 - ''
                 - - '$(mysql '
