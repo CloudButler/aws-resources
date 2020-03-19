@@ -358,11 +358,7 @@ Resources:
     Type: 'AWS::EC2::Instance'
     Metadata:
       'AWS::CloudFormation::Init':
-        configSets:
-          InstallAndRun:
-            - Install
-            - Configure
-        Install:
+        config:
           packages:
             yum:
               docker: []
@@ -371,20 +367,10 @@ Resources:
               docker:
                 enabled: 'true'
                 ensureRunning: 'true'
-        Configure:
-          commands:
-            # From https://docs.aws.amazon.com/AmazonECS/latest/developerguide/docker-basics.html
-            01_add_ec2user_to_docker_group:
-              command:  
-                - 'usermod -a -G docker ec2-user'
-              test: 
-                - 'getent group docker | grep -Fxq "ec2-user"; (( $? != 0 ))'
-            02_docker_info:
-              command:  
-                - 'docker info'
-              # TODO: create test for `docker info` command
-              test: 
-                - ''
+          users:
+            ec2-user:
+              groups:
+                - "docker"
     Properties:
       ImageId: !FindInMap 
         - AWSRegionArch2AMI
