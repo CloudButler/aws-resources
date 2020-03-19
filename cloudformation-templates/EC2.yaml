@@ -417,7 +417,7 @@ Resources:
       'AWS::CloudFormation::Designer':
         id: 297fdee4-0969-46cd-95f1-d4d0c2d45150
 # TODO: determine useful output for template 
-Outputs:
+#Outputs:
   # WebsiteURL:
   #   Description: URL for newly created LAMP stack
   #   Value: !Join 
