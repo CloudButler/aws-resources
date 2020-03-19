@@ -378,7 +378,7 @@ Resources:
               command:  
                 - 'usermod -a -G docker ec2-user'
               test: 
-                - 'getent group docker | grep -Fxq "ec2-user"'; (( $? != 0 ))
+                - 'getent group docker | grep -Fxq "ec2-user"; (( $? != 0 ))'
             02_docker_info:
               command:  
                 - 'docker info'
