@@ -409,7 +409,7 @@ Resources:
             ec2-user:
               groups:
                 - "docker"
-          services: 
+          services:
             sysvinit: 
               docker: 
                 enabled: "true"
@@ -516,9 +516,10 @@ Resources:
             02_set_docker_compose_executable:
               command: "chmod +x /usr/local/bin/docker-compose"
               test: "test -e /usr/local/bin/docker-compose"
-            10_docker_compose:
-              command: "export COG_HOST=$(hostname -I | awk '{print $1}') && cd /opt/cloud-butler/ && docker-compose up -d"
-              test: "test -e /opt/cloud-butler/docker-compose.yml"
+            # fails to run docker-compose
+            # 10_docker_compose:
+            #   command: "export COG_HOST=$(hostname -I | awk '{print $1}') && cd /opt/cloud-butler/ && service docker start && docker-compose up -d"
+            #   test: "test -e /opt/cloud-butler/docker-compose.yml"
     Properties:
       ImageId: !FindInMap 
         - AWSRegionArch2AMI
