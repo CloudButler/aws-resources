@@ -479,7 +479,7 @@ Resources:
               owner: "root"
               group: "docker"
               mode: "000644"
-            /opt/cloud-butler/docker-compose.override.slack_example.yml:
+            /opt/cloud-butler/docker-compose.override.yml:
               content: !Sub |
                 version: '2'
                 services:
@@ -492,6 +492,7 @@ Resources:
                       - COG_BOOTSTRAP_EMAIL_ADDRESS={{ bootstrap_email }}
                       - COG_BOOTSTRAP_FIRST_NAME={{ bootstrap_first_name }}
                       - COG_BOOTSTRAP_LAST_NAME={{ bootstrap_last_name }}
+                      - COG_TELEMETRY=false
                       - RELAY_ID={{ relay_id }}
                       - RELAY_COG_TOKEN={{ relay_token }}
                   relay:
@@ -510,16 +511,28 @@ Resources:
               owner: "root"
               group: "docker"
               mode: "000644"
+            /opt/cloud-butler/run.sh:
+              content: !Sub |
+                #!/bin/bash
+                export COG_HOST=$(hostname -I | awk '{print $1}')
+                service docker start
+                docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d
+              owner: "root"
+              group: "docker"
+              mode: "000744"
           commands:
             01_install_docker_compose:
-              command: "curl -L \"https://github.com/docker/compose/releases/download/1.25.4/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose"
+              command: "curl -L \"https://github.com/docker/compose/releases/download/1.25.4/docker-compose-$(uname -s)-$(uname -m)\" -o /bin/docker-compose"
             02_set_docker_compose_executable:
-              command: "chmod +x /usr/local/bin/docker-compose"
-              test: "test -e /usr/local/bin/docker-compose"
-            # fails to run docker-compose
-            # 10_docker_compose:
-            #   command: "export COG_HOST=$(hostname -I | awk '{print $1}') && cd /opt/cloud-butler/ && service docker start && docker-compose up -d"
-            #   test: "test -e /opt/cloud-butler/docker-compose.yml"
+              command: "chmod +x /bin/docker-compose"
+              test: "test -e /bin/docker-compose"
+            03_export_cog_host:
+              command: "export COG_HOST=$(hostname -I | awk '{print $1}')"
+            04_ensure_docker_started:
+              command: "service docker start"
+            10_run:
+              command: "docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d"
+              test: "test -e /opt/cloud-butler/docker-compose.yml"
     Properties:
       ImageId: !FindInMap 
         - AWSRegionArch2AMI
