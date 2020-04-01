@@ -526,12 +526,10 @@ Resources:
             02_set_docker_compose_executable:
               command: "chmod +x /bin/docker-compose"
               test: "test -e /bin/docker-compose"
-            03_export_cog_host:
-              command: "export COG_HOST=$(hostname -I | awk '{print $1}')"
-            04_ensure_docker_started:
+            03_ensure_docker_started:
               command: "service docker start"
             10_run:
-              command: "docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d"
+              command: "export COG_HOST=$(hostname -I | awk '{print $1}') && docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d"
               test: "test -e /opt/cloud-butler/docker-compose.yml"
     Properties:
       ImageId: !FindInMap 
