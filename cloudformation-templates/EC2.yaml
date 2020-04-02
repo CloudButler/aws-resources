@@ -511,15 +511,6 @@ Resources:
               owner: "root"
               group: "docker"
               mode: "000644"
-            /opt/cloud-butler/run.sh:
-              content: !Sub |
-                #!/bin/bash
-                export COG_HOST=$(hostname -I | awk '{print $1}')
-                service docker start
-                docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d
-              owner: "root"
-              group: "docker"
-              mode: "000744"
           commands:
             01_install_docker_compose:
               command: "curl -L \"https://github.com/docker/compose/releases/download/1.25.4/docker-compose-$(uname -s)-$(uname -m)\" -o /bin/docker-compose"
@@ -528,9 +519,10 @@ Resources:
               test: "test -e /bin/docker-compose"
             03_ensure_docker_started:
               command: "service docker start"
-            10_run:
-              command: "export COG_HOST=$(hostname -I | awk '{print $1}') && docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d"
-              test: "test -e /opt/cloud-butler/docker-compose.yml"
+            # 10_run: # THIS ONLY WORKED IN UserData
+            #   command: "export COG_HOST=$(hostname -I | awk '{print $1}') && docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d"
+            #   cwd: "/opt/cloud-butler/"
+            #   test: "test -e /opt/cloud-butler/docker-compose.yml"
     Properties:
       ImageId: !FindInMap 
         - AWSRegionArch2AMI
@@ -549,6 +541,8 @@ Resources:
                 yum update -y aws-cfn-bootstrap
                 /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource CloudButlerInstance --region ${AWS::Region}
                 /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource CloudButlerInstance --region ${AWS::Region}
+                export COG_HOST=$(hostname -I | awk '{print $1}')
+                docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d
     CreationPolicy:
       ResourceSignal:
         Timeout: PT5M
