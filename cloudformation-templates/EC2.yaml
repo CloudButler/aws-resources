@@ -517,8 +517,8 @@ Resources:
             02_set_docker_compose_executable:
               command: "chmod +x /bin/docker-compose"
               test: "test -e /bin/docker-compose"
-            03_ensure_docker_started:
-              command: "service docker start"
+            # 03_ensure_docker_started:
+            #   command: "service docker start"
             # 10_run: # THIS ONLY WORKED IN UserData
             #   command: "export COG_HOST=$(hostname -I | awk '{print $1}') && docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d"
             #   cwd: "/opt/cloud-butler/"
@@ -533,7 +533,7 @@ Resources:
           - Arch
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref WebServerSecurityGroup
+        - !Ref SSHSecurityGroup
       KeyName: !Ref KeyName
       UserData: 
               'Fn::Base64': !Sub |
@@ -546,22 +546,15 @@ Resources:
     CreationPolicy:
       ResourceSignal:
         Timeout: PT5M
-  WebServerSecurityGroup:
+  SSHSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupDescription: Enable HTTP access via port 80
+      GroupDescription: Enable SSH access via port 22
       SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: '80'
-          ToPort: '80'
-          CidrIp: 0.0.0.0/0
         - IpProtocol: tcp
           FromPort: '22'
           ToPort: '22'
           CidrIp: !Ref SSHLocation
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: 297fdee4-0969-46cd-95f1-d4d0c2d45150
 Outputs:
   InstanceId:
     Description: InstanceId of the newly created EC2 instance
