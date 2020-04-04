@@ -9,7 +9,7 @@
       "RDSDemoVpc": {
         "Type": "AWS::EC2::VPC",
         "Properties": {
-          "CidrBlock": "192.168.0.0/16",
+          "CidrBlock": "10.0.0.0/24",
           "EnableDnsHostnames": "True",
           "EnableDnsSupport": "True",
         	"Tags": [
@@ -40,7 +40,7 @@
           "VpcId": {
             "Ref": "RDSDemoVpc"
           },
-          "CidrBlock": "192.168.1.0/24",
+          "CidrBlock": "10.0.0.32/27",
           "Tags": [
             {
               "Key": "Name",
@@ -56,7 +56,7 @@
           "VpcId": {
             "Ref": "RDSDemoVpc"
           },
-          "CidrBlock": "192.168.2.0/24",
+          "CidrBlock": "10.0.0.64/27",
           "Tags": [
             {
               "Key": "Name",
@@ -107,6 +107,21 @@
           "StorageType": "gp2",
           "Tags": [{ "Key": "Name", "Value":"MyRdsDemo" }]
         }
+      },
+      "myRoute" : {
+        "Type" : "AWS::EC2::Route",
+        "Properties" : {
+          "RouteTableId" : { "Ref" : "myRouteTable" },
+          "DestinationCidrBlock" : "0.0.0.0/0",
+          "GatewayId" : { "Ref" : "myInternetGateway" }
+        }
+      },
+      "myRouteTable" : {
+         "Type" : "AWS::EC2::RouteTable",
+         "Properties" : {
+           "VpcId" : { "Ref" : "RDSDemoVpc" },
+           "Tags" : [ { "Key" : "Name", "Value" : "RT" } ]
+         }
       },
       "rdsSecurityGroup" : {
         "Type" : "AWS::EC2::SecurityGroup",
