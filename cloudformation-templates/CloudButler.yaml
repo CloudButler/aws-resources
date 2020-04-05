@@ -576,8 +576,9 @@ Resources:
           - !Ref InstanceType
           - Arch
       InstanceType: !Ref InstanceType
-      SecurityGroups:
-        - !GetAtt SSHSecurityGroup.GroupId
+      # ADD BACK WHEN SSHSecurityGroup is enabled again
+      # SecurityGroupIds:
+      #   - !GetAtt SSHSecurityGroup.GroupId
       KeyName: !Ref KeyName
       Tags:
         - Key: Name
@@ -651,19 +652,20 @@ Resources:
       Tags:
         - Key: Name
           Value: CloudButlerPrivateSubnet2
-  SSHSecurityGroup:
-    Type: 'AWS::EC2::SecurityGroup'
-    Properties:
-      GroupDescription: Enable SSH access via port 22
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: !Ref SSHLocation
-      VpcId: !Ref DbVPC
-    Metadata:
-      'AWS::CloudFormation::Designer':
-        id: a9631ecf-02ed-4348-a401-62bffcdd7294
+  # ADD BACK WHEN AN INTERNET NETWORK IS ATTACHED TO EC2 INSTANCE
+  # SSHSecurityGroup:
+  #   Type: 'AWS::EC2::SecurityGroup'
+  #   Properties:
+  #     GroupDescription: Enable SSH access via port 22
+  #     SecurityGroupIngress:
+  #       - IpProtocol: tcp
+  #         FromPort: 22
+  #         ToPort: 22
+  #         CidrIp: !Ref SSHLocation
+  #     VpcId: !Ref DbVPC
+  #   Metadata:
+  #     'AWS::CloudFormation::Designer':
+  #       id: a9631ecf-02ed-4348-a401-62bffcdd7294
   DbSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
