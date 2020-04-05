@@ -498,8 +498,7 @@ Resources:
               context:
                 postgres_user: !Ref MasterUsername
                 postgres_password: !Ref MasterPassword
-                # ecto://user:pass@hostname:port/dbname
-                database_url: !Join
+                database_url: !Join 
                   - ''
                   - - 'ecto://'
                     - !Ref MasterUsername
@@ -576,9 +575,6 @@ Resources:
           - !Ref InstanceType
           - Arch
       InstanceType: !Ref InstanceType
-      # ADD BACK WHEN SSHSecurityGroup is enabled again
-      # SecurityGroupIds:
-      #   - !GetAtt SSHSecurityGroup.GroupId
       KeyName: !Ref KeyName
       Tags:
         - Key: Name
@@ -599,6 +595,8 @@ Resources:
 
           docker-compose -f /opt/cloud-butler/docker-compose.yml -f
           /opt/cloud-butler/docker-compose.override.yml up -d
+      NetworkInterfaces:
+        - SubnetId: !Ref PrivateSubnet1
     CreationPolicy:
       ResourceSignal:
         Timeout: PT5M
