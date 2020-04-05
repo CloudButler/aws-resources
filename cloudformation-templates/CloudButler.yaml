@@ -1,6 +1,7 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: >-
-  Cloud Butler template.  This will create an RDS instance and EC2 instance for Cloud Butler.
+  Cloud Butler template.  This will create an RDS instance and EC2 instance for
+  Cloud Butler.
 Parameters:
   KeyName:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
@@ -67,32 +68,27 @@ Parameters:
       - cg1.4xlarge
     ConstraintDescription: must be a valid EC2 instance type.
   SSHLocation:
-    Description: 'The IP address range that can be used to SSH to the EC2 instances'
+    Description: The IP address range that can be used to SSH to the EC2 instances
     Type: String
     MinLength: '9'
     MaxLength: '18'
     Default: 0.0.0.0/0
     AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
     ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
-                  # REMOVE POSTGRES CONTAINER ONCE RDS WORKS
-                  # REMOVE POSTGRES CONTAINER ONCE RDS WORKS
-                  # REMOVE POSTGRES CONTAINER ONCE RDS WORKS
-  # Remove once RDS works
-  PostgresUser:
-    Description: The username cloudbutler will use to login to the database
+  MasterUsername:
+    Description: The master username to the database
     Type: String
-    Default: 'cog'
-  # Remove once RDS works
-  PostgresPassword:
-    Description: The password for the cloudbutler database user
+    Default: postgres
+  MasterPassword:
+    Description: The master password for the database user
     Type: String
-    Default: 'cog'
-  DatabaseURL:
-    Description: The database connection URL (defaults to local)
-    Type: String
-    Default: 'ecto://cog:cog@postgres:5432/cog'
+    MinLength: '8'
+    Default: 'postgres'
+    ConstraintDescription: must be at least 8 characters long.
   SlackAPIToken:
-    Description: Slack token usually in the form 'xoxb-87931061512-4m0DshC79h8tLNjTMuxxozUo'
+    Description: >-
+      Slack token usually in the form
+      'xoxb-87931061512-4m0DshC79h8tLNjTMuxxozUo'
     Type: String
     Default: ''
   RelayToken:
@@ -102,27 +98,39 @@ Parameters:
   BootstrapUsername:
     Description: The first admin username.
     Type: String
-    Default: 'cloudbutler'
+    Default: cloudbutler
   BootstrapPassword:
     Description: The first admin password.
     Type: String
-    Default: 'cloudbutler'
+    Default: cloudbutler
   BootstrapEmail:
     Description: The first admin email address.
     Type: String
-    Default: 'cloudbutler@localhost'
+    Default: cloudbutler@localhost
   BootstrapFirstName:
     Description: The first admin first name.
     Type: String
-    Default: 'Cloud'
+    Default: Cloud
   BootstrapLastName:
     Description: The first admin last name.
     Type: String
-    Default: 'Butler'
+    Default: Butler
   RelayID:
     Description: ID of the relay (must be unique among all relays).
     Type: String
-    Default: '00000000-0000-0000-0000-000000000000'
+    Default: 00000000-0000-0000-0000-000000000000
+  VpcCidrBlock:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 192.168.0.0/16
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  DBName:
+    Description: The name of the Cloud Butler database
+    Type: String
+    Default: "cloudbutler"
 Mappings:
   AWSInstanceType2Arch:
     t1.micro:
@@ -397,7 +405,34 @@ Mappings:
       HVM64: ami-0f7937761741dc640
       HVMG2: NOT_SUPPORTED
 Resources:
-  CloudButlerInstance:
+  RdsDbInstance:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      AllocatedStorage: '20'
+      DBInstanceClass: db.t2.micro
+      AllowMajorVersionUpgrade: 'false'
+      AutoMinorVersionUpgrade: 'false'
+      BackupRetentionPeriod: '7'
+      DBInstanceIdentifier: CloudButlerRDS
+      DBName: !Ref DBName
+      VPCSecurityGroups:
+        - !Ref DbSecurityGroup
+      DBSubnetGroupName: !Ref RdsDbSubnetGroup
+      Engine: postgres
+      EngineVersion: '9.5'
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterPassword
+      MultiAZ: 'false'
+      Port: '5432'
+      PubliclyAccessible: 'false'
+      StorageType: gp2
+      Tags:
+        - Key: Name
+          Value: CloudButlerRDS
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 1b697a65-29f6-4491-8414-0e42d27bcd42
+  Ec2Instance:
     Type: 'AWS::EC2::Instance'
     Metadata:
       'AWS::CloudFormation::Init':
@@ -408,15 +443,15 @@ Resources:
           users:
             ec2-user:
               groups:
-                - "docker"
+                - docker
           services:
-            sysvinit: 
-              docker: 
-                enabled: "true"
-                ensureRunning: "true"
-                packages: 
-                  yum: 
-                    - "docker"
+            sysvinit:
+              docker:
+                enabled: 'true'
+                ensureRunning: 'true'
+                packages:
+                  yum:
+                    - docker
           files:
             /opt/cloud-butler/docker-compose.yml:
               content: !Sub |
@@ -460,13 +495,23 @@ Resources:
                     depends_on:
                       - cog
                     entrypoint: /usr/local/bin/relay
-              context: 
-                postgres_user: !Ref PostgresUser
-                postgres_password: !Ref PostgresPassword
-                database_url: !Ref DatabaseURL
-              owner: "root"
-              group: "docker"
-              mode: "000644"
+              context:
+                postgres_user: !Ref MasterUsername
+                postgres_password: !Ref MasterPassword
+                # ecto://user:pass@hostname:port/dbname
+                database_url: !Join
+                  - ''
+                  - - 'ecto://'
+                    - !Ref MasterUsername
+                    - ':'
+                    - !Ref MasterPassword
+                    - '@'
+                    - !GetAtt RdsDbInstance.Endpoint.Address
+                    - ':5432/'
+                    - !Ref DBName
+              owner: root
+              group: docker
+              mode: '000644'
             /opt/cloud-butler/docker-compose.common.yml:
               content: !Sub |
                 version: '2'
@@ -476,9 +521,9 @@ Resources:
                       - COG_API_URL_BASE=http://${!COG_HOST}
                       - COG_TRIGGER_URL_BASE=http://${!COG_HOST}:4001
                       - COG_SERVICE_URL_BASE=http://${!COG_HOST}:4002
-              owner: "root"
-              group: "docker"
-              mode: "000644"
+              owner: root
+              group: docker
+              mode: '000644'
             /opt/cloud-butler/docker-compose.override.yml:
               content: !Sub |
                 version: '2'
@@ -508,21 +553,20 @@ Resources:
                 bootstrap_last_name: !Ref BootstrapLastName
                 relay_id: !Ref RelayID
                 relay_token: !Ref RelayToken
-              owner: "root"
-              group: "docker"
-              mode: "000644"
+              owner: root
+              group: docker
+              mode: '000644'
           commands:
             01_install_docker_compose:
-              command: "curl -L \"https://github.com/docker/compose/releases/download/1.25.4/docker-compose-$(uname -s)-$(uname -m)\" -o /bin/docker-compose"
+              command: >-
+                curl -L
+                "https://github.com/docker/compose/releases/download/1.25.4/docker-compose-$(uname
+                -s)-$(uname -m)" -o /bin/docker-compose
             02_set_docker_compose_executable:
-              command: "chmod +x /bin/docker-compose"
-              test: "test -e /bin/docker-compose"
-            # 03_ensure_docker_started:
-            #   command: "service docker start"
-            # 10_run: # THIS ONLY WORKED IN UserData
-            #   command: "export COG_HOST=$(hostname -I | awk '{print $1}') && docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d"
-            #   cwd: "/opt/cloud-butler/"
-            #   test: "test -e /opt/cloud-butler/docker-compose.yml"
+              command: chmod +x /bin/docker-compose
+              test: test -e /bin/docker-compose
+      'AWS::CloudFormation::Designer':
+        id: 920484aa-53ca-4d07-83a0-3488ce9c3688
     Properties:
       ImageId: !FindInMap 
         - AWSRegionArch2AMI
@@ -533,67 +577,233 @@ Resources:
           - Arch
       InstanceType: !Ref InstanceType
       SecurityGroups:
-        - !Ref SSHSecurityGroup
+        - !GetAtt SSHSecurityGroup.GroupId
       KeyName: !Ref KeyName
-      UserData: 
-              'Fn::Base64': !Sub |
-                #!/bin/bash -ex
-                yum update -y aws-cfn-bootstrap
-                /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource CloudButlerInstance --region ${AWS::Region}
-                /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource CloudButlerInstance --region ${AWS::Region}
-                export COG_HOST=$(hostname -I | awk '{print $1}')
-                docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d
+      Tags:
+        - Key: Name
+          Value: CloudButler
+      UserData:
+        'Fn::Base64': !Sub >
+          #!/bin/bash -ex
+
+          yum update -y aws-cfn-bootstrap
+
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource
+          Ec2Instance --region ${AWS::Region}
+
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource
+          Ec2Instance --region ${AWS::Region}
+
+          export COG_HOST=$(hostname -I | awk '{print $1}')
+
+          docker-compose -f /opt/cloud-butler/docker-compose.yml -f
+          /opt/cloud-butler/docker-compose.override.yml up -d
     CreationPolicy:
       ResourceSignal:
         Timeout: PT5M
+    DependsOn:
+      - RdsDbInstance
+  DbVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VpcCidrBlock
+      Tags:
+        - Key: Name
+          Value: CloudButlerVPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 08a73238-2b34-4067-828f-0e5e0c4924bc
+  RdsDbSubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: Subnets for RDS
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: CloudButlerSubnetGroup
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+  PrivateSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Select 
+        - 0
+        - 'Fn::GetAZs': !Ref 'AWS::Region'
+      VpcId: !Ref DbVPC
+      CidrBlock: 192.168.1.0/24
+      Tags:
+        - Key: Name
+          Value: CloudButlerPrivateSubnet1
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 1ff8a172-fc7c-4088-8903-0a38781f206d
+  PrivateSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Select 
+        - 1
+        - 'Fn::GetAZs': !Ref 'AWS::Region'
+      VpcId: !Ref DbVPC
+      CidrBlock: 192.168.2.0/24
+      Tags:
+        - Key: Name
+          Value: CloudButlerPrivateSubnet2
   SSHSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: Enable SSH access via port 22
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: '22'
-          ToPort: '22'
+          FromPort: 22
+          ToPort: 22
           CidrIp: !Ref SSHLocation
-  DatabaseSecurityGroup:
-    Type: "AWS::EC2::SecurityGroup"
+      VpcId: !Ref DbVPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: a9631ecf-02ed-4348-a401-62bffcdd7294
+  DbSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
     Properties:
-      GroupName: !Sub "${StackName}-Database"
-      GroupDescription: "Security group for the database"
+      GroupName: CloudButlerDBSecurityGroup
+      GroupDescription: Security group for the database
       SecurityGroupIngress:
-        # This opens the port to anything in the VpcCidrBlock, which means this will need to be added to the parameters and the EC2 Instance
         - CidrIp: !Ref VpcCidrBlock
-          Description: Database ingress from CloudButlerInstance
+          Description: Database ingress
           IpProtocol: tcp
           FromPort: 5432
           ToPort: 5432
-        - CidrIp: 10.0.0.0/8
-          Description: Open to local.
-          IpProtocol: tcp
-          FromPort: 5432
-          ToPort: 5432
-      VpcId: !Ref VpcId # This VPC needs to be added to Resources
+      VpcId: !Ref DbVPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c46a38e0-8e32-4639-b2d8-3a73352e6d7b
 Outputs:
   InstanceId:
     Description: InstanceId of the newly created EC2 instance
-    Value: !Ref CloudButlerInstance
+    Value: !Ref Ec2Instance
   AZ:
     Description: Availability Zone of the newly created EC2 instance
     Value: !GetAtt 
-      - CloudButlerInstance
+      - Ec2Instance
       - AvailabilityZone
   PublicDNS:
     Description: Public DNSName of the newly created EC2 instance
     Value: !GetAtt 
-      - CloudButlerInstance
+      - Ec2Instance
       - PublicDnsName
   PublicIP:
     Description: Public IP address of the newly created EC2 instance
     Value: !GetAtt 
-      - CloudButlerInstance
+      - Ec2Instance
       - PublicIp
   PrivateIP:
     Description: Private IP address of the newly created EC2 instance
     Value: !GetAtt 
-      - CloudButlerInstance
+      - Ec2Instance
       - PrivateIp
+Metadata:
+  'AWS::CloudFormation::Designer':
+    a9631ecf-02ed-4348-a401-62bffcdd7294:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 570
+        'y': 360
+      z: 2
+      parent: 08a73238-2b34-4067-828f-0e5e0c4924bc
+      embeds: []
+      iscontainedinside:
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+    08a73238-2b34-4067-828f-0e5e0c4924bc:
+      size:
+        width: 690
+        height: 600
+      position:
+        x: 60
+        'y': 90
+      z: 1
+      embeds:
+        - c46a38e0-8e32-4639-b2d8-3a73352e6d7b
+        - a9631ecf-02ed-4348-a401-62bffcdd7294
+        - 1ff8a172-fc7c-4088-8903-0a38781f206d
+    c46a38e0-8e32-4639-b2d8-3a73352e6d7b:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 570
+        'y': 150
+      z: 2
+      parent: 08a73238-2b34-4067-828f-0e5e0c4924bc
+      embeds: []
+      iscontainedinside:
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+    1ff8a172-fc7c-4088-8903-0a38781f206d:
+      size:
+        width: 420
+        height: 420
+      position:
+        x: 90
+        'y': 150
+      z: 2
+      parent: 08a73238-2b34-4067-828f-0e5e0c4924bc
+      embeds:
+        - fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+      iscontainedinside:
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+    fffd4fda-9e2c-4bf3-8677-9bb489c9b24b:
+      size:
+        width: 240
+        height: 240
+      position:
+        x: 120
+        'y': 210
+      z: 3
+      parent: 1ff8a172-fc7c-4088-8903-0a38781f206d
+      embeds:
+        - 920484aa-53ca-4d07-83a0-3488ce9c3688
+        - 1b697a65-29f6-4491-8414-0e42d27bcd42
+      iscontainedinside:
+        - 1ff8a172-fc7c-4088-8903-0a38781f206d
+        - 1ff8a172-fc7c-4088-8903-0a38781f206d
+    920484aa-53ca-4d07-83a0-3488ce9c3688:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 260
+        'y': 360
+      z: 4
+      parent: fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+      embeds: []
+      isassociatedwith:
+        - a9631ecf-02ed-4348-a401-62bffcdd7294
+      dependson:
+        - 1b697a65-29f6-4491-8414-0e42d27bcd42
+    1b697a65-29f6-4491-8414-0e42d27bcd42:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 150
+        'y': 270
+      z: 4
+      parent: fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+      embeds: []
+      isassociatedwith:
+        - c46a38e0-8e32-4639-b2d8-3a73352e6d7b
+      iscontainedinside:
+        - fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+        - fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+    22b6d3f5-bd41-43b6-b9f4-c3a7376c5933:
+      source:
+        id: 920484aa-53ca-4d07-83a0-3488ce9c3688
+      target:
+        id: 1b697a65-29f6-4491-8414-0e42d27bcd42
+      z: 6
