@@ -1,0 +1,867 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Cloud Butler template.  This will create an RDS instance and EC2 instance for
+  Cloud Butler.
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+      - t1.micro
+      - t2.nano
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+      - m1.small
+      - m1.medium
+      - m1.large
+      - m1.xlarge
+      - m2.xlarge
+      - m2.2xlarge
+      - m2.4xlarge
+      - m3.medium
+      - m3.large
+      - m3.xlarge
+      - m3.2xlarge
+      - m4.large
+      - m4.xlarge
+      - m4.2xlarge
+      - m4.4xlarge
+      - m4.10xlarge
+      - c1.medium
+      - c1.xlarge
+      - c3.large
+      - c3.xlarge
+      - c3.2xlarge
+      - c3.4xlarge
+      - c3.8xlarge
+      - c4.large
+      - c4.xlarge
+      - c4.2xlarge
+      - c4.4xlarge
+      - c4.8xlarge
+      - g2.2xlarge
+      - g2.8xlarge
+      - r3.large
+      - r3.xlarge
+      - r3.2xlarge
+      - r3.4xlarge
+      - r3.8xlarge
+      - i2.xlarge
+      - i2.2xlarge
+      - i2.4xlarge
+      - i2.8xlarge
+      - d2.xlarge
+      - d2.2xlarge
+      - d2.4xlarge
+      - d2.8xlarge
+      - hi1.4xlarge
+      - hs1.8xlarge
+      - cr1.8xlarge
+      - cc2.8xlarge
+      - cg1.4xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 0.0.0.0/0
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  MasterUsername:
+    Description: The master username to the database
+    Type: String
+    Default: postgres
+  MasterPassword:
+    Description: The master password for the database user
+    Type: String
+    MinLength: '8'
+    Default: 'postgres'
+    ConstraintDescription: must be at least 8 characters long.
+  SlackAPIToken:
+    Description: >-
+      Slack token usually in the form
+      'xoxb-87931061512-4m0DshC79h8tLNjTMuxxozUo'
+    Type: String
+    Default: ''
+  RelayToken:
+    Description: A secret word or phrase shared between relay and server.
+    Type: String
+    Default: ''
+  BootstrapUsername:
+    Description: The first admin username.
+    Type: String
+    Default: cloudbutler
+  BootstrapPassword:
+    Description: The first admin password.
+    Type: String
+    Default: cloudbutler
+  BootstrapEmail:
+    Description: The first admin email address.
+    Type: String
+    Default: cloudbutler@localhost
+  BootstrapFirstName:
+    Description: The first admin first name.
+    Type: String
+    Default: Cloud
+  BootstrapLastName:
+    Description: The first admin last name.
+    Type: String
+    Default: Butler
+  RelayID:
+    Description: ID of the relay (must be unique among all relays).
+    Type: String
+    Default: 00000000-0000-0000-0000-000000000000
+  VpcCidrBlock:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 192.168.0.0/16
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  DBName:
+    Description: The name of the Cloud Butler database
+    Type: String
+    Default: "cloudbutler"
+Mappings:
+  AWSInstanceType2Arch:
+    t1.micro:
+      Arch: HVM64
+    t2.nano:
+      Arch: HVM64
+    t2.micro:
+      Arch: HVM64
+    t2.small:
+      Arch: HVM64
+    t2.medium:
+      Arch: HVM64
+    t2.large:
+      Arch: HVM64
+    m1.small:
+      Arch: HVM64
+    m1.medium:
+      Arch: HVM64
+    m1.large:
+      Arch: HVM64
+    m1.xlarge:
+      Arch: HVM64
+    m2.xlarge:
+      Arch: HVM64
+    m2.2xlarge:
+      Arch: HVM64
+    m2.4xlarge:
+      Arch: HVM64
+    m3.medium:
+      Arch: HVM64
+    m3.large:
+      Arch: HVM64
+    m3.xlarge:
+      Arch: HVM64
+    m3.2xlarge:
+      Arch: HVM64
+    m4.large:
+      Arch: HVM64
+    m4.xlarge:
+      Arch: HVM64
+    m4.2xlarge:
+      Arch: HVM64
+    m4.4xlarge:
+      Arch: HVM64
+    m4.10xlarge:
+      Arch: HVM64
+    c1.medium:
+      Arch: HVM64
+    c1.xlarge:
+      Arch: HVM64
+    c3.large:
+      Arch: HVM64
+    c3.xlarge:
+      Arch: HVM64
+    c3.2xlarge:
+      Arch: HVM64
+    c3.4xlarge:
+      Arch: HVM64
+    c3.8xlarge:
+      Arch: HVM64
+    c4.large:
+      Arch: HVM64
+    c4.xlarge:
+      Arch: HVM64
+    c4.2xlarge:
+      Arch: HVM64
+    c4.4xlarge:
+      Arch: HVM64
+    c4.8xlarge:
+      Arch: HVM64
+    g2.2xlarge:
+      Arch: HVMG2
+    g2.8xlarge:
+      Arch: HVMG2
+    r3.large:
+      Arch: HVM64
+    r3.xlarge:
+      Arch: HVM64
+    r3.2xlarge:
+      Arch: HVM64
+    r3.4xlarge:
+      Arch: HVM64
+    r3.8xlarge:
+      Arch: HVM64
+    i2.xlarge:
+      Arch: HVM64
+    i2.2xlarge:
+      Arch: HVM64
+    i2.4xlarge:
+      Arch: HVM64
+    i2.8xlarge:
+      Arch: HVM64
+    d2.xlarge:
+      Arch: HVM64
+    d2.2xlarge:
+      Arch: HVM64
+    d2.4xlarge:
+      Arch: HVM64
+    d2.8xlarge:
+      Arch: HVM64
+    hi1.4xlarge:
+      Arch: HVM64
+    hs1.8xlarge:
+      Arch: HVM64
+    cr1.8xlarge:
+      Arch: HVM64
+    cc2.8xlarge:
+      Arch: HVM64
+  AWSInstanceType2NATArch:
+    t1.micro:
+      Arch: NATHVM64
+    t2.nano:
+      Arch: NATHVM64
+    t2.micro:
+      Arch: NATHVM64
+    t2.small:
+      Arch: NATHVM64
+    t2.medium:
+      Arch: NATHVM64
+    t2.large:
+      Arch: NATHVM64
+    m1.small:
+      Arch: NATHVM64
+    m1.medium:
+      Arch: NATHVM64
+    m1.large:
+      Arch: NATHVM64
+    m1.xlarge:
+      Arch: NATHVM64
+    m2.xlarge:
+      Arch: NATHVM64
+    m2.2xlarge:
+      Arch: NATHVM64
+    m2.4xlarge:
+      Arch: NATHVM64
+    m3.medium:
+      Arch: NATHVM64
+    m3.large:
+      Arch: NATHVM64
+    m3.xlarge:
+      Arch: NATHVM64
+    m3.2xlarge:
+      Arch: NATHVM64
+    m4.large:
+      Arch: NATHVM64
+    m4.xlarge:
+      Arch: NATHVM64
+    m4.2xlarge:
+      Arch: NATHVM64
+    m4.4xlarge:
+      Arch: NATHVM64
+    m4.10xlarge:
+      Arch: NATHVM64
+    c1.medium:
+      Arch: NATHVM64
+    c1.xlarge:
+      Arch: NATHVM64
+    c3.large:
+      Arch: NATHVM64
+    c3.xlarge:
+      Arch: NATHVM64
+    c3.2xlarge:
+      Arch: NATHVM64
+    c3.4xlarge:
+      Arch: NATHVM64
+    c3.8xlarge:
+      Arch: NATHVM64
+    c4.large:
+      Arch: NATHVM64
+    c4.xlarge:
+      Arch: NATHVM64
+    c4.2xlarge:
+      Arch: NATHVM64
+    c4.4xlarge:
+      Arch: NATHVM64
+    c4.8xlarge:
+      Arch: NATHVM64
+    g2.2xlarge:
+      Arch: NATHVMG2
+    g2.8xlarge:
+      Arch: NATHVMG2
+    r3.large:
+      Arch: NATHVM64
+    r3.xlarge:
+      Arch: NATHVM64
+    r3.2xlarge:
+      Arch: NATHVM64
+    r3.4xlarge:
+      Arch: NATHVM64
+    r3.8xlarge:
+      Arch: NATHVM64
+    i2.xlarge:
+      Arch: NATHVM64
+    i2.2xlarge:
+      Arch: NATHVM64
+    i2.4xlarge:
+      Arch: NATHVM64
+    i2.8xlarge:
+      Arch: NATHVM64
+    d2.xlarge:
+      Arch: NATHVM64
+    d2.2xlarge:
+      Arch: NATHVM64
+    d2.4xlarge:
+      Arch: NATHVM64
+    d2.8xlarge:
+      Arch: NATHVM64
+    hi1.4xlarge:
+      Arch: NATHVM64
+    hs1.8xlarge:
+      Arch: NATHVM64
+    cr1.8xlarge:
+      Arch: NATHVM64
+    cc2.8xlarge:
+      Arch: NATHVM64
+  AWSRegionArch2AMI:
+    us-east-1:
+      HVM64: ami-0080e4c5bc078760e
+      HVMG2: ami-0aeb704d503081ea6
+    us-west-2:
+      HVM64: ami-01e24be29428c15b2
+      HVMG2: ami-0fe84a5b4563d8f27
+    us-west-1:
+      HVM64: ami-0ec6517f6edbf8044
+      HVMG2: ami-0a7fc72dc0e51aa77
+    eu-west-1:
+      HVM64: ami-08935252a36e25f85
+      HVMG2: ami-0d5299b1c6112c3c7
+    eu-west-2:
+      HVM64: ami-01419b804382064e4
+      HVMG2: NOT_SUPPORTED
+    eu-west-3:
+      HVM64: ami-0dd7e7ed60da8fb83
+      HVMG2: NOT_SUPPORTED
+    eu-central-1:
+      HVM64: ami-0cfbf4f6db41068ac
+      HVMG2: ami-0aa1822e3eb913a11
+    eu-north-1:
+      HVM64: ami-86fe70f8
+      HVMG2: ami-32d55b4c
+    ap-northeast-1:
+      HVM64: ami-00a5245b4816c38e6
+      HVMG2: ami-09d0e0e099ecabba2
+    ap-northeast-2:
+      HVM64: ami-00dc207f8ba6dc919
+      HVMG2: NOT_SUPPORTED
+    ap-northeast-3:
+      HVM64: ami-0b65f69a5c11f3522
+      HVMG2: NOT_SUPPORTED
+    ap-southeast-1:
+      HVM64: ami-05b3bcf7f311194b3
+      HVMG2: ami-0e46ce0d6a87dc979
+    ap-southeast-2:
+      HVM64: ami-02fd0b06f06d93dfc
+      HVMG2: ami-0c0ab057a101d8ff2
+    ap-south-1:
+      HVM64: ami-0ad42f4f66f6c1cc9
+      HVMG2: ami-0244c1d42815af84a
+    us-east-2:
+      HVM64: ami-0cd3dfa4e37921605
+      HVMG2: NOT_SUPPORTED
+    ca-central-1:
+      HVM64: ami-07423fb63ea0a0930
+      HVMG2: NOT_SUPPORTED
+    sa-east-1:
+      HVM64: ami-05145e0b28ad8e0b2
+      HVMG2: NOT_SUPPORTED
+    cn-north-1:
+      HVM64: ami-053617c9d818c1189
+      HVMG2: NOT_SUPPORTED
+    cn-northwest-1:
+      HVM64: ami-0f7937761741dc640
+      HVMG2: NOT_SUPPORTED
+Resources:
+  RdsDbInstance:
+    Type: 'AWS::RDS::DBInstance'
+    Properties:
+      AllocatedStorage: '20'
+      DBInstanceClass: db.t2.micro
+      AllowMajorVersionUpgrade: 'false'
+      AutoMinorVersionUpgrade: 'false'
+      BackupRetentionPeriod: '7'
+      DBInstanceIdentifier: CloudButlerRDS
+      DBName: !Ref DBName
+      VPCSecurityGroups:
+        - !Ref DbSecurityGroup
+      DBSubnetGroupName: !Ref RdsDbSubnetGroup
+      Engine: postgres
+      EngineVersion: '9.5'
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterPassword
+      MultiAZ: 'false'
+      Port: '5432'
+      PubliclyAccessible: 'false'
+      StorageType: gp2
+      Tags:
+        - Key: Name
+          Value: CloudButlerRDS
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 1b697a65-29f6-4491-8414-0e42d27bcd42
+  Ec2Instance:
+    Type: 'AWS::EC2::Instance'
+    DeletionPolicy: Retain
+    Metadata:
+      'AWS::CloudFormation::Init':
+        config:
+          packages:
+            yum:
+              docker: []
+          users:
+            ec2-user:
+              groups:
+                - docker
+          services:
+            sysvinit:
+              docker:
+                enabled: 'true'
+                ensureRunning: 'true'
+                packages:
+                  yum:
+                    - docker
+          files:
+            /opt/cloud-butler/docker-compose.yml:
+              content: !Sub |
+                version: '2'
+                services:
+                  ############ REMOVE POSTGRES CONTAINER ONCE RDS WORKS
+                  postgres:
+                    image: postgres:9.5
+                    environment:
+                      - POSTGRES_USER={{ postgres_user }}
+                      - POSTGRES_PASSWORD={{ postgres_password }}
+                  cog:
+                    extends:
+                      file: docker-compose.common.yml
+                      service: common
+                    image: operable/cog:1.0
+                    environment:
+                      - COG_MQTT_HOST=0.0.0.0
+                      - DATABASE_URL={{ database_url }}
+                    depends_on:
+                      - postgres
+                    ports:
+                      - 1883
+                      - 80:4000
+                      - 4001:4001
+                      - 4002:4002
+                    entrypoint: /home/operable/cog/scripts/docker-start
+                  relay:
+                    extends:
+                      file: docker-compose.common.yml
+                      service: common
+                    image: operable/relay:1.0
+                    privileged: true
+                    volumes:
+                      - /var/run/docker.sock:/var/run/docker.sock
+                    environment:
+                      - RELAY_COG_REFRESH_INTERVAL=30s
+                      - RELAY_DOCKER_CLEAN_INTERVAL=1m
+                      - RELAY_COG_HOST=cog
+                      - RELAY_DYNAMIC_CONFIG_ROOT=/tmp/bundle_configs
+                    depends_on:
+                      - cog
+                    entrypoint: /usr/local/bin/relay
+              context:
+                postgres_user: !Ref MasterUsername
+                postgres_password: !Ref MasterPassword
+                database_url: !Join
+                  - ''
+                  - - 'ecto://'
+                    - !Ref MasterUsername
+                    - ':'
+                    - !Ref MasterPassword
+                    - '@'
+                    - !GetAtt RdsDbInstance.Endpoint.Address
+                    - ':5432/'
+                    - !Ref DBName
+              owner: root
+              group: docker
+              mode: '000644'
+            /opt/cloud-butler/docker-compose.common.yml:
+              content: !Sub |
+                version: '2'
+                services:
+                  common:
+                    environment:
+                      - COG_API_URL_BASE=http://${!COG_HOST}
+                      - COG_TRIGGER_URL_BASE=http://${!COG_HOST}:4001
+                      - COG_SERVICE_URL_BASE=http://${!COG_HOST}:4002
+              owner: root
+              group: docker
+              mode: '000644'
+            /opt/cloud-butler/docker-compose.override.yml:
+              content: !Sub |
+                version: '2'
+                services:
+                  cog:
+                    environment:
+                      - COG_SLACK_ENABLED=1
+                      - SLACK_API_TOKEN={{ slack_api_token }}
+                      - COG_BOOTSTRAP_USERNAME={{ bootstrap_username }}
+                      - COG_BOOTSTRAP_PASSWORD={{ bootstrap_password }}
+                      - COG_BOOTSTRAP_EMAIL_ADDRESS={{ bootstrap_email }}
+                      - COG_BOOTSTRAP_FIRST_NAME={{ bootstrap_first_name }}
+                      - COG_BOOTSTRAP_LAST_NAME={{ bootstrap_last_name }}
+                      - COG_TELEMETRY=false
+                      - RELAY_ID={{ relay_id }}
+                      - RELAY_COG_TOKEN={{ relay_token }}
+                  relay:
+                    environment:
+                      - RELAY_ID={{ relay_id }}
+                      - RELAY_COG_TOKEN={{ relay_token }}
+              context:
+                slack_api_token: !Ref SlackAPIToken
+                bootstrap_username: !Ref BootstrapUsername
+                bootstrap_password: !Ref BootstrapPassword
+                bootstrap_email: !Ref BootstrapEmail
+                bootstrap_first_name: !Ref BootstrapFirstName
+                bootstrap_last_name: !Ref BootstrapLastName
+                relay_id: !Ref RelayID
+                relay_token: !Ref RelayToken
+              owner: root
+              group: docker
+              mode: '000644'
+          commands:
+            01_install_docker_compose:
+              command: >-
+                curl -L
+                "https://github.com/docker/compose/releases/download/1.25.4/docker-compose-$(uname
+                -s)-$(uname -m)" -o /bin/docker-compose
+            02_set_docker_compose_executable:
+              command: chmod +x /bin/docker-compose
+              test: test -e /bin/docker-compose
+      'AWS::CloudFormation::Designer':
+        id: 920484aa-53ca-4d07-83a0-3488ce9c3688
+    Properties:
+      ImageId: !FindInMap
+        - AWSRegionArch2AMI
+        - !Ref 'AWS::Region'
+        - !FindInMap
+          - AWSInstanceType2Arch
+          - !Ref InstanceType
+          - Arch
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      Tags:
+        - Key: Name
+          Value: CloudButler
+      UserData:
+        'Fn::Base64': !Sub >
+          #!/bin/bash -ex
+
+          yum update -y aws-cfn-bootstrap
+
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource
+          Ec2Instance --region ${AWS::Region}
+
+          /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource
+          Ec2Instance --region ${AWS::Region}
+
+          export COG_HOST=$(hostname -I | awk '{print $1}')
+
+          docker-compose -f /opt/cloud-butler/docker-compose.yml -f
+          /opt/cloud-butler/docker-compose.override.yml up -d
+      #SecurityGroupIds:
+      #    - Ref: EC2SecurityGroup
+      SubnetId: !Ref PrivateSubnet1
+
+      #NetworkInterfaces:
+      #- NetworkInterfaceId: !Ref myENI
+      #- AssociatePublicIpAddress: "true"
+      #  DeviceIndex: 0
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT5M
+    DependsOn:
+      - RdsDbInstance
+#  myENI:
+#    Type: AWS::EC2::NetworkInterface
+#    Properties:
+#         Tags:
+#         - Key: Name
+#           Value: ENI
+#         Description: A nice description.
+#         SourceDestCheck: 'false'
+#         GroupSet:
+#         - Ref: EC2SecurityGroup
+#         SubnetId: !Ref PrivateSubnet1
+         ##PrivateIpAddress: 192.168.0.4
+  #myEIP:
+#    Type: AWS::EC2::EIP
+#    Properties:
+#      InstanceId: !Ref Ec2Instance
+#      Domain: vpc
+#  EIPAssoc1:
+#    Type: AWS::EC2::EIPAssociation
+#    Properties:
+#      NetworkInterfaceId: !Ref myENI
+#      AllocationId: !GetAtt [myEIP, AllocationId]
+
+  myInternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref DbVPC
+      InternetGatewayId: !Ref myInternetGateway
+  DbVPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VpcCidrBlock
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      Tags:
+        - Key: Name
+          Value: CloudButlerVPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 08a73238-2b34-4067-828f-0e5e0c4924bc
+  RdsDbSubnetGroup:
+    Type: 'AWS::RDS::DBSubnetGroup'
+    Properties:
+      DBSubnetGroupDescription: Subnets for RDS
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: CloudButlerSubnetGroup
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+  PrivateSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - 'Fn::GetAZs': !Ref 'AWS::Region'
+      VpcId: !Ref DbVPC
+      CidrBlock: 192.168.1.0/24
+      Tags:
+        - Key: Name
+          Value: CloudButlerPrivateSubnet1
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 1ff8a172-fc7c-4088-8903-0a38781f206d
+  PrivateSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - 'Fn::GetAZs': !Ref 'AWS::Region'
+      VpcId: !Ref DbVPC
+      CidrBlock: 192.168.2.0/24
+      Tags:
+        - Key: Name
+          Value: CloudButlerPrivateSubnet2
+  # ADD BACK WHEN AN INTERNET NETWORK IS ATTACHED TO EC2 INSTANCE
+  # SSHSecurityGroup:
+  #   Type: 'AWS::EC2::SecurityGroup'
+  #   Properties:
+  #     GroupDescription: Enable SSH access via port 22
+  #     SecurityGroupIngress:
+  #       - IpProtocol: tcp
+  #         FromPort: 22
+  #         ToPort: 22
+  #         CidrIp: !Ref SSHLocation
+  #     VpcId: !Ref DbVPC
+  #   Metadata:
+  #     'AWS::CloudFormation::Designer':
+  #       id: a9631ecf-02ed-4348-a401-62bffcdd7294
+  EC2SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: CloudButlerEC2SecurityGroup
+      GroupDescription: Security group for the EC2
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0 #!Ref VpcCidrBlock
+          Description: Database ingress
+          IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+        - CidrIp: 0.0.0.0/0 #!Ref VpcCidrBlock
+          Description: Database ingress
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+      VpcId: !Ref DbVPC
+  DbSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: CloudButlerDBSecurityGroup
+      GroupDescription: Security group for the database
+      SecurityGroupIngress:
+        - CidrIp: !Ref VpcCidrBlock
+          Description: Database ingress
+          IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+      VpcId: !Ref DbVPC
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c46a38e0-8e32-4639-b2d8-3a73352e6d7b
+Outputs:
+  InstanceId:
+    Description: InstanceId of the newly created EC2 instance
+    Value: !Ref Ec2Instance
+  AZ:
+    Description: Availability Zone of the newly created EC2 instance
+    Value: !GetAtt
+      - Ec2Instance
+      - AvailabilityZone
+  PublicDNS:
+    Description: Public DNSName of the newly created EC2 instance
+    Value: !GetAtt
+      - Ec2Instance
+      - PublicDnsName
+  PublicIP:
+    Description: Public IP address of the newly created EC2 instance
+    Value: !GetAtt
+      - Ec2Instance
+      - PublicIp
+  PrivateIP:
+    Description: Private IP address of the newly created EC2 instance
+    Value: !GetAtt
+      - Ec2Instance
+      - PrivateIp
+Metadata:
+  'AWS::CloudFormation::Designer':
+    a9631ecf-02ed-4348-a401-62bffcdd7294:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 570
+        'y': 360
+      z: 2
+      parent: 08a73238-2b34-4067-828f-0e5e0c4924bc
+      embeds: []
+      iscontainedinside:
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+    08a73238-2b34-4067-828f-0e5e0c4924bc:
+      size:
+        width: 690
+        height: 600
+      position:
+        x: 60
+        'y': 90
+      z: 1
+      embeds:
+        - c46a38e0-8e32-4639-b2d8-3a73352e6d7b
+        - a9631ecf-02ed-4348-a401-62bffcdd7294
+        - 1ff8a172-fc7c-4088-8903-0a38781f206d
+    c46a38e0-8e32-4639-b2d8-3a73352e6d7b:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 570
+        'y': 150
+      z: 2
+      parent: 08a73238-2b34-4067-828f-0e5e0c4924bc
+      embeds: []
+      iscontainedinside:
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+    1ff8a172-fc7c-4088-8903-0a38781f206d:
+      size:
+        width: 420
+        height: 420
+      position:
+        x: 90
+        'y': 150
+      z: 2
+      parent: 08a73238-2b34-4067-828f-0e5e0c4924bc
+      embeds:
+        - fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+      iscontainedinside:
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+        - 08a73238-2b34-4067-828f-0e5e0c4924bc
+    fffd4fda-9e2c-4bf3-8677-9bb489c9b24b:
+      size:
+        width: 240
+        height: 240
+      position:
+        x: 120
+        'y': 210
+      z: 3
+      parent: 1ff8a172-fc7c-4088-8903-0a38781f206d
+      embeds:
+        - 920484aa-53ca-4d07-83a0-3488ce9c3688
+        - 1b697a65-29f6-4491-8414-0e42d27bcd42
+      iscontainedinside:
+        - 1ff8a172-fc7c-4088-8903-0a38781f206d
+        - 1ff8a172-fc7c-4088-8903-0a38781f206d
+    920484aa-53ca-4d07-83a0-3488ce9c3688:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 260
+        'y': 360
+      z: 4
+      parent: fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+      embeds: []
+      isassociatedwith:
+        - a9631ecf-02ed-4348-a401-62bffcdd7294
+      dependson:
+        - 1b697a65-29f6-4491-8414-0e42d27bcd42
+    1b697a65-29f6-4491-8414-0e42d27bcd42:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 150
+        'y': 270
+      z: 4
+      parent: fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+      embeds: []
+      isassociatedwith:
+        - c46a38e0-8e32-4639-b2d8-3a73352e6d7b
+      iscontainedinside:
+        - fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+        - fffd4fda-9e2c-4bf3-8677-9bb489c9b24b
+    22b6d3f5-bd41-43b6-b9f4-c3a7376c5933:
+      source:
+        id: 920484aa-53ca-4d07-83a0-3488ce9c3688
+      target:
+        id: 1b697a65-29f6-4491-8414-0e42d27bcd42
+      z: 6
