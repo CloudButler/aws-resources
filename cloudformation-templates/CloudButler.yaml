@@ -529,9 +529,9 @@ Resources:
                 #!/bin/bash -ex
                 yum update -y aws-cfn-bootstrap
                 /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource CloudButlerInstance --region ${AWS::Region}
-                /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource CloudButlerInstance --region ${AWS::Region}
                 export COG_HOST=$(hostname -I | awk '{print $1}')
                 docker-compose -f /opt/cloud-butler/docker-compose.yml -f /opt/cloud-butler/docker-compose.override.yml up -d
+                /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource CloudButlerInstance --region ${AWS::Region}
     CreationPolicy:
       ResourceSignal:
         Timeout: PT5M
