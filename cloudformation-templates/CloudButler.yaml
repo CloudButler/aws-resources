@@ -481,6 +481,7 @@ Resources:
                   cog:
                     environment:
                       - COG_SLACK_ENABLED=1
+                      - COG_ALLOW_SELF_REGISTRATION=1
                       - SLACK_API_TOKEN={{ slack_api_token }}
                       - COG_BOOTSTRAP_USERNAME={{ bootstrap_username }}
                       - COG_BOOTSTRAP_PASSWORD={{ bootstrap_password }}
